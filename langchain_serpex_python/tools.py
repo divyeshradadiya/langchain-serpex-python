@@ -1,9 +1,7 @@
 """SERPEX Search Tool for LangChain."""
 
-from __future__ import annotations
-
 import os
-from typing import Any
+from typing import Any, Optional
 
 import httpx
 from langchain_core.callbacks import CallbackManagerForToolRun
@@ -94,7 +92,7 @@ class SerpexSearchResults(BaseTool):
         default="web",
         description="Search category (currently only 'web' supported)",
     )
-    time_range: str | None = Field(
+    time_range: Optional[str] = Field(
         default=None,
         description=(
             "Time range: all, day, week, month, year (not supported by Brave)"
@@ -214,7 +212,7 @@ class SerpexSearchResults(BaseTool):
     def _run(
         self,
         query: str,
-        run_manager: CallbackManagerForToolRun | None = None,
+        run_manager: Optional[CallbackManagerForToolRun] = None,
         **kwargs: Any,
     ) -> str:
         """Execute the search."""
@@ -248,7 +246,7 @@ class SerpexSearchResults(BaseTool):
     async def _arun(
         self,
         query: str,
-        run_manager: CallbackManagerForToolRun | None = None,
+        run_manager: Optional[CallbackManagerForToolRun] = None,
         **kwargs: Any,
     ) -> str:
         """Execute the search asynchronously."""
