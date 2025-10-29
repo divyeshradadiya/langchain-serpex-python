@@ -38,8 +38,7 @@ from langchain_serpex_python import SerpexSearchResults
 # Initialize the tool
 tool = SerpexSearchResults(
     api_key="your-serpex-api-key",
-    engine="google",
-    num_results=10
+    engine="google"
 )
 
 # Perform a search
@@ -57,8 +56,7 @@ from langchain.agents import initialize_agent, AgentType
 # Initialize the search tool
 search_tool = SerpexSearchResults(
     api_key="your-serpex-api-key",
-    engine="google",
-    num_results=5
+    engine="google"
 )
 
 # Initialize the LLM
@@ -86,12 +84,7 @@ from langchain_serpex_python import SerpexSearchResults
 tool = SerpexSearchResults(
     api_key="your-serpex-api-key",
     engine="google",
-    num_results=20,
-    gl="us",  # Country code
-    hl="en",  # Language code
-    location="New York",  # Specific location
-    time_period="m",  # Results from past month
-    safe_search="moderate"
+    time_range="month"
 )
 
 # Search for location-specific results
@@ -138,13 +131,9 @@ tool = SerpexSearchResults()  # Will use SERPEX_API_KEY from environment
 ### Parameters
 
 - `api_key` (str): Your SERPEX API key (required)
-- `engine` (str): Search engine to use - "google", "bing", "duckduckgo", "baidu", "yandex" (default: "google")
-- `num_results` (int): Number of results to return, 1-100 (default: 10)
-- `gl` (str): Country code for localized results (e.g., "us", "uk", "ca")
-- `hl` (str): Language code (e.g., "en", "es", "fr")
-- `location` (str): Specific location for localized results
-- `time_period` (str): Time filter - "d" (day), "w" (week), "m" (month), "y" (year)
-- `safe_search` (str): Safe search filter - "off", "moderate", "strict"
+- `engine` (str): Search engine to use - "auto", "google", "bing", "duckduckgo", "brave", "yahoo", "yandex" (default: "auto")
+- `category` (str): Search category - currently only "web" is supported (default: "web")
+- `time_range` (str): Time filter - "all", "day", "week", "month", "year" (not supported by Brave)
 
 ## Documentation
 
