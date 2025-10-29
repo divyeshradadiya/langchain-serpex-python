@@ -5,6 +5,6 @@ which supports multiple search engines including Google, Bing, DuckDuckGo,
 Baidu, and Yandex.
 """
 
-from langchain_serpex.tools import SerpexSearchResults
+from langchain_serpex_python.tools import SerpexSearchResults
 
 __all__ = ["SerpexSearchResults"]
