@@ -10,27 +10,26 @@ from pydantic import Field, SecretStr, model_validator
 
 
 class SerpexSearchResults(BaseTool):
-    """Tool for searching the web using the SERPEX API.
+    """Tool for real-time web search with Serpex.
 
-    SERPEX provides multi-engine search results from Google, Bing, DuckDuckGo,
-    Brave, Yahoo, and Yandex search engines in JSON format.
+    Serpex is a real-time web search API that returns results as JSON.
 
     Setup:
-        Install `langchain-serpex` and set environment variable `SERPEX_API_KEY`.
+        Install `langchain-serpex-python` and set environment variable
+        `SERPEX_API_KEY`.
 
         ```bash
-        pip install -U langchain-serpex
+        pip install -U langchain-serpex-python
         export SERPEX_API_KEY="your-serpex-api-key"
         ```
 
     Instantiation:
         ```python
-        from langchain_serpex import SerpexSearchResults
+        from langchain_serpex_python import SerpexSearchResults
 
         # With explicit API key
         tool = SerpexSearchResults(
             api_key="your-serpex-api-key",
-            engine="auto",  # or google, bing, duckduckgo, brave, yahoo, yandex
             time_range="day"  # optional: all, day, week, month, year
         )
 
@@ -47,14 +46,13 @@ class SerpexSearchResults(BaseTool):
         # With specific parameters
         results = tool.invoke({
             "query": "Python programming",
-            "engine": "google",
             "time_range": "week"
         })
         ```
 
     Example with Agent:
         ```python
-        from langchain_serpex import SerpexSearchResults
+        from langchain_serpex_python import SerpexSearchResults
         from langchain_openai import ChatOpenAI
         from langchain.agents import initialize_agent, AgentType
 
@@ -73,19 +71,18 @@ class SerpexSearchResults(BaseTool):
 
     name: str = "serpex_search"
     description: str = (
-        "A powerful multi-engine web search tool. "
+        "A real-time web search tool. "
         "Useful for answering questions about current events, "
         "finding information from the web, and getting real-time data. "
-        "Input should be a search query string. "
-        "Supports automatic routing with retry logic and multiple search engines "
-        "(Google, Bing, DuckDuckGo, Brave, Yahoo, Yandex)."
+        "Input should be a search query string."
     )
 
     api_key: SecretStr = Field(default_factory=lambda: SecretStr(""))
     engine: str = Field(
         default="auto",
         description=(
-            "Search engine: auto, google, bing, duckduckgo, brave, yahoo, yandex"
+            "Deprecated: ignored by the Serpex API since 2026-06 (Serpex is a "
+            "single search engine). Still accepted for backward compatibility."
         ),
     )
     category: str = Field(
@@ -95,7 +92,7 @@ class SerpexSearchResults(BaseTool):
     time_range: Optional[str] = Field(
         default=None,
         description=(
-            "Time range: all, day, week, month, year (not supported by Brave)"
+            "Time range: all, day, week, month, year"
         ),
     )
 

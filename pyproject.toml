@@ -4,8 +4,9 @@ build-backend = "hatchling.build"
 
 [project]
 name = "langchain-serpex-python"
-version = "0.1.5"
-description = "An integration package connecting SERPEX and LangChain (Python)"
+version = "0.1.6"
+description = "LangChain integration for Serpex, a real-time web search API (Python)"
+keywords = ["langchain", "serpex", "search", "search-api", "web-search", "real-time-search", "ai-agents", "llm", "rag"]
 readme = "README.md"
 license = {text = "MIT"}
 authors = []
@@ -18,8 +19,8 @@ dependencies = [
 [project.urls]
 Homepage = "https://docs.langchain.com/oss/python/integrations/providers/serpex"
 Documentation = "https://serpex.dev/docs"
-Source = "https://github.com/divyeshradadiya/langchain-serpex"
-Repository = "https://github.com/divyeshradadiya/langchain-serpex"
+Source = "https://github.com/divyeshradadiya/langchain-serpex-python"
+Repository = "https://github.com/divyeshradadiya/langchain-serpex-python"
 
 [dependency-groups]
 test = [
