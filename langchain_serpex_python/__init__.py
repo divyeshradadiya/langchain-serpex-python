@@ -1,8 +1,7 @@
-"""SERPEX integration for LangChain.
+"""Serpex integration for LangChain.
 
-This module provides tools for searching the web using the SERPEX API,
-which supports multiple search engines including Google, Bing, DuckDuckGo,
-Baidu, and Yandex.
+This module provides a LangChain tool for real-time web search with Serpex,
+a real-time web search API.
 """
 
 from langchain_serpex_python.tools import SerpexSearchResults

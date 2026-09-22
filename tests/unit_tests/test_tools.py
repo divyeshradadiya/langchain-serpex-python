@@ -6,7 +6,7 @@ from typing import Any
 import pytest
 from pydantic import SecretStr
 
-from langchain_serpex import SerpexSearchResults
+from langchain_serpex_python import SerpexSearchResults
 
 
 def test_serpex_initialization() -> None:
@@ -28,33 +28,33 @@ def test_serpex_custom_parameters() -> None:
     """Test that Serpex accepts custom parameters."""
     tool = SerpexSearchResults(
         api_key=SecretStr("test_api_key"),
-        engine="google",
+        engine="legacy-value",
         category="web",
         time_range="day",
     )
-    assert tool.engine == "google"
+    assert tool.engine == "legacy-value"
     assert tool.time_range == "day"
 
 
 def test_serpex_build_params() -> None:
     """Test that _build_params creates correct parameters."""
     tool = SerpexSearchResults(
-        api_key=SecretStr("test_key"), engine="bing", time_range="week"
+        api_key=SecretStr("test_key"), engine="legacy-a", time_range="week"
     )
     params = tool._build_params("test query")
 
     assert params["q"] == "test query"
-    assert params["engine"] == "bing"
+    assert params["engine"] == "legacy-a"
     assert params["category"] == "web"
     assert params["time_range"] == "week"
 
 
 def test_serpex_build_params_override() -> None:
     """Test that _build_params allows overrides."""
-    tool = SerpexSearchResults(api_key=SecretStr("test_key"), engine="google")
-    params = tool._build_params("test query", engine="duckduckgo", time_range="month")
+    tool = SerpexSearchResults(api_key=SecretStr("test_key"), engine="legacy-a")
+    params = tool._build_params("test query", engine="legacy-b", time_range="month")
 
-    assert params["engine"] == "duckduckgo"
+    assert params["engine"] == "legacy-b"
     assert params["time_range"] == "month"
 
 

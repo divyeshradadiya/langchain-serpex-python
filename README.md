@@ -4,7 +4,7 @@
 [![PyPI - License](https://img.shields.io/pypi/l/langchain-serpex-python)](https://opensource.org/licenses/MIT)
 [![Twitter](https://img.shields.io/twitter/url/https/twitter.com/langchainai.svg?style=social&label=Follow%20%40LangChainAI)](https://twitter.com/langchainai)
 
-This package contains the LangChain integration with SERPEX (Python).
+This package contains the LangChain integration with Serpex (Python).
 
 ## Installation
 
@@ -12,17 +12,19 @@ This package contains the LangChain integration with SERPEX (Python).
 pip install langchain-serpex-python
 ```
 
-## What is SERPEX?
+## What is Serpex?
 
-SERPEX is a powerful multi-engine search API that provides access to search results from Google, Bing, DuckDuckGo, Baidu, Yandex, and other search engines in JSON format. It's designed for developers building AI applications, SEO tools, market research platforms, and data aggregation services.
+Serpex is a real-time web search API. It returns structured JSON results
+(title, URL, snippet) for any query, and offers page content extraction that
+turns URLs into LLM-ready markdown. It's built for AI agents, LLM tools and
+RAG pipelines.
 
 ## Features
 
-- **Multi-Engine Support**: Search across Google, Bing, DuckDuckGo, Baidu, and Yandex
-- **Rich Results**: Get organic results, answer boxes, knowledge graphs, news, images, videos, and shopping results
-- **Localization**: Support for location-based and language-specific searches
-- **Real-time Data**: Access to current search results
-- **Easy Integration**: Simple API with comprehensive documentation
+- **Real-time web search**: current results for any query
+- **One search engine**: nothing to configure — no engine to pick
+- **LangChain-native**: a drop-in `BaseTool` for agents and chains
+- **Easy integration**: API key via argument or `SERPEX_API_KEY`
 
 ## Quick Start
 
@@ -36,10 +38,7 @@ Sign up at [SERPEX](https://serpex.dev) to get your API key.
 from langchain_serpex_python import SerpexSearchResults
 
 # Initialize the tool
-tool = SerpexSearchResults(
-    api_key="your-serpex-api-key",
-    engine="google"
-)
+tool = SerpexSearchResults(api_key="your-serpex-api-key")
 
 # Perform a search
 results = tool.invoke("latest AI developments")
@@ -54,10 +53,7 @@ from langchain_openai import ChatOpenAI
 from langchain.agents import initialize_agent, AgentType
 
 # Initialize the search tool
-search_tool = SerpexSearchResults(
-    api_key="your-serpex-api-key",
-    engine="google"
-)
+search_tool = SerpexSearchResults(api_key="your-serpex-api-key")
 
 # Initialize the LLM
 llm = ChatOpenAI(temperature=0)
@@ -83,32 +79,18 @@ from langchain_serpex_python import SerpexSearchResults
 # Configure with advanced parameters
 tool = SerpexSearchResults(
     api_key="your-serpex-api-key",
-    engine="google",
     time_range="month"
 )
 
-# Search for location-specific results
 results = tool.invoke("best restaurants")
 print(results)
 ```
 
-### Different Search Engines
+### The `engine` parameter (deprecated)
 
-```python
-from langchain_serpex_python import SerpexSearchResults
-
-# Google Search
-google_tool = SerpexSearchResults(api_key="your-key", engine="google")
-google_results = google_tool.invoke("Python programming")
-
-# Bing Search
-bing_tool = SerpexSearchResults(api_key="your-key", engine="bing")
-bing_results = bing_tool.invoke("Python programming")
-
-# DuckDuckGo Search
-ddg_tool = SerpexSearchResults(api_key="your-key", engine="duckduckgo")
-ddg_results = ddg_tool.invoke("Python programming")
-```
+Serpex is one search engine, so there is nothing to select. `engine` is
+deprecated and ignored by the Serpex API since 2026-06; it is still accepted
+so existing code keeps working.
 
 ## Configuration
 
@@ -130,10 +112,10 @@ tool = SerpexSearchResults()  # Will use SERPEX_API_KEY from environment
 
 ### Parameters
 
-- `api_key` (str): Your SERPEX API key (required)
-- `engine` (str): Search engine to use - "auto", "google", "bing", "duckduckgo", "brave", "yahoo", "yandex" (default: "auto")
+- `api_key` (str): Your Serpex API key (required)
+- `engine` (str): **Deprecated** — ignored by the Serpex API (default: "auto"); still accepted
 - `category` (str): Search category - currently only "web" is supported (default: "web")
-- `time_range` (str): Time filter - "all", "day", "week", "month", "year" (not supported by Brave)
+- `time_range` (str): Time filter - "all", "day", "week", "month", "year"
 
 ## Documentation
 

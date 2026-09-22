@@ -5,13 +5,13 @@ import os
 import pytest
 from pydantic import SecretStr
 
-from langchain_serpex import SerpexSearchResults
+from langchain_serpex_python import SerpexSearchResults
 
 
 @pytest.mark.compile
 def test_import() -> None:
     """Test that the module can be imported."""
-    from langchain_serpex import SerpexSearchResults  # noqa: F401
+    from langchain_serpex_python import SerpexSearchResults  # noqa: F401
 
 
 @pytest.mark.skipif("SERPEX_API_KEY" not in os.environ, reason="SERPEX_API_KEY not set")
@@ -30,15 +30,13 @@ def test_serpex_search_integration() -> None:
 
 
 @pytest.mark.skipif("SERPEX_API_KEY" not in os.environ, reason="SERPEX_API_KEY not set")
-def test_serpex_different_engines() -> None:
-    """Test search with different engines."""
+def test_serpex_deprecated_engine_still_accepted() -> None:
+    """The deprecated `engine` value is still accepted (and ignored by the API)."""
     api_key = os.getenv("SERPEX_API_KEY")
     if not api_key:
         pytest.skip("SERPEX_API_KEY not set")
 
-    engines = ["google", "bing", "duckduckgo"]
-
-    for engine in engines:
+    for engine in ["auto", "legacy-value"]:
         tool = SerpexSearchResults(api_key=SecretStr(api_key), engine=engine)
         result = tool._run("test query")
         assert result
