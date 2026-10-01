@@ -4,9 +4,9 @@ build-backend = "hatchling.build"
 
 [project]
 name = "langchain-serpex-python"
-version = "0.1.7"
-description = "LangChain integration for Serpex, a web search API for AI agents (Python)"
-keywords = ["langchain", "serpex", "search", "search-api", "web-search", "real-time-search", "ai-agents", "llm", "rag"]
+version = "0.2.0"
+description = "LangChain integration for Serpex, the web search API and extract API for AI agents (Python)"
+keywords = ["langchain", "serpex", "search", "search-api", "web-search", "ai-agents", "llm", "rag"]
 readme = "README.md"
 license = {text = "MIT"}
 authors = []

@@ -14,14 +14,14 @@ pip install langchain-serpex-python
 
 ## What is Serpex?
 
-Serpex is a real-time web search API. It returns structured JSON results
-(title, URL, snippet) for any query, and offers page content extraction that
-turns URLs into LLM-ready markdown. It's built for AI agents, LLM tools and
-RAG pipelines.
+Serpex is the web search API and extract API for AI agents. Search returns
+ranked web results (title, URL, snippet), optionally with page content as
+markdown; Extract turns known URLs into clean markdown. It's built for AI
+agents, LLM tools and RAG pipelines.
 
 ## Features
 
-- **Real-time web search**: current results for any query
+- **Web search**: ranked results for any query, optionally with page content as markdown
 - **One search engine**: nothing to configure — no engine to pick
 - **LangChain-native**: a drop-in `BaseTool` for agents and chains
 - **Easy integration**: API key via argument or `SERPEX_API_KEY`
@@ -76,21 +76,23 @@ print(result)
 ```python
 from langchain_serpex_python import SerpexSearchResults
 
-# Configure with advanced parameters
+# Also fetch page content (markdown) for the top 5 or 10 results
 tool = SerpexSearchResults(
     api_key="your-serpex-api-key",
-    time_range="month"
+    include_content=True,
+    content_results=5,
 )
 
 results = tool.invoke("best restaurants")
 print(results)
 ```
 
-### The `engine` parameter (deprecated)
+### Deprecated parameters
 
-Serpex is one search engine, so there is nothing to select. `engine` is
-deprecated and ignored by the Serpex API since 2026-06; it is still accepted
-so existing code keeps working.
+Serpex is one search engine, so there is nothing to select. `engine`,
+`category` and `time_range` are deprecated and ignored by the Serpex API; they
+are still accepted so existing code keeps working, emit a `DeprecationWarning`,
+and are not sent. They will be removed in 0.3.0.
 
 ## Configuration
 
@@ -113,9 +115,10 @@ tool = SerpexSearchResults()  # Will use SERPEX_API_KEY from environment
 ### Parameters
 
 - `api_key` (str): Your Serpex API key (required)
-- `engine` (str): **Deprecated** — ignored by the Serpex API (default: "auto"); still accepted
-- `category` (str): Search category - currently only "web" is supported (default: "web")
-- `time_range` (str): Time filter - "all", "day", "week", "month", "year"
+- `include_content` (bool): Also fetch page content (markdown) for the top results (default: `False`). Best-effort: a page that can't be extracted shows its `content_error` instead.
+- `content_results` (int): How many top results get content, `5` or `10` (default: `5`)
+- `timeout` (float): Request timeout in seconds (default: 60, or 100 with `include_content`)
+- `engine`, `category`, `time_range`: **Deprecated** — ignored by the Serpex API and not sent; removed in 0.3.0
 
 ## Documentation
 

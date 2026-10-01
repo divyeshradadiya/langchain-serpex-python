@@ -1,6 +1,7 @@
-"""SERPEX Search Tool for LangChain."""
+"""Serpex Search Tool for LangChain."""
 
 import os
+import warnings
 from typing import Any, Optional
 
 import httpx
@@ -8,11 +9,35 @@ from langchain_core.callbacks import CallbackManagerForToolRun
 from langchain_core.tools import BaseTool
 from pydantic import Field, SecretStr, model_validator
 
+__version__ = "0.2.0"
+
+USER_AGENT = f"langchain-serpex-python/{__version__}"
+
+# Client timeouts (seconds), above the server's own budget for each call
+# (search 30 s upstream, 45 s with include_content), so the tool never gives
+# up on a request the server still finishes and bills.
+SEARCH_TIMEOUT = 60.0
+SEARCH_CONTENT_TIMEOUT = 100.0
+
+# Accepted for backward compatibility, ignored by the Serpex API, never sent.
+DEPRECATED_PARAMS = ("engine", "engines", "category", "time_range")
+
+
+def _warn_deprecated(names: list[str]) -> None:
+    warnings.warn(
+        f"{', '.join(names)} {'is' if len(names) == 1 else 'are'} deprecated and "
+        "ignored by the Serpex API; the value is not sent. Remove it from your "
+        "code; it will be removed in 0.3.0.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
+
 
 class SerpexSearchResults(BaseTool):
-    """Tool for real-time web search with Serpex.
+    """Web search tool backed by Serpex.
 
-    Serpex is a real-time web search API that returns results as JSON.
+    Serpex is the web search API and extract API for AI agents. Search returns
+    ranked web results, optionally with page content as markdown.
 
     Setup:
         Install `langchain-serpex-python` and set environment variable
@@ -28,10 +53,10 @@ class SerpexSearchResults(BaseTool):
         from langchain_serpex_python import SerpexSearchResults
 
         # With explicit API key
-        tool = SerpexSearchResults(
-            api_key="your-serpex-api-key",
-            time_range="day"  # optional: all, day, week, month, year
-        )
+        tool = SerpexSearchResults(api_key="your-serpex-api-key")
+
+        # Also fetch page content (markdown) for the top 5 results
+        tool = SerpexSearchResults(include_content=True, content_results=5)
 
         # Or using environment variable
         tool = SerpexSearchResults()
@@ -39,15 +64,8 @@ class SerpexSearchResults(BaseTool):
 
     Invocation:
         ```python
-        # Basic search
         results = tool.invoke("latest AI developments")
         print(results)
-
-        # With specific parameters
-        results = tool.invoke({
-            "query": "Python programming",
-            "time_range": "week"
-        })
         ```
 
     Example with Agent:
@@ -71,30 +89,36 @@ class SerpexSearchResults(BaseTool):
 
     name: str = "serpex_search"
     description: str = (
-        "A real-time web search tool. "
-        "Useful for answering questions about current events, "
-        "finding information from the web, and getting real-time data. "
+        "A web search tool. "
+        "Useful for answering questions about current events and "
+        "finding information from the web. "
         "Input should be a search query string."
     )
 
     api_key: SecretStr = Field(default_factory=lambda: SecretStr(""))
-    engine: str = Field(
-        default="auto",
+    include_content: bool = Field(
+        default=False,
         description=(
-            "Deprecated: ignored by the Serpex API since 2026-06 (Serpex is a "
-            "single search engine). Still accepted for backward compatibility."
+            "Also fetch page content (markdown) for the top results. Best-effort: "
+            "a page that cannot be extracted carries content_error instead."
         ),
     )
-    category: str = Field(
-        default="web",
-        description="Search category (currently only 'web' supported)",
+    content_results: int = Field(
+        default=5,
+        description="How many top results get content when include_content is on: 5 or 10.",
     )
-    time_range: Optional[str] = Field(
+    timeout: Optional[float] = Field(
         default=None,
         description=(
-            "Time range: all, day, week, month, year"
+            "Request timeout in seconds. Default: 60 s, or 100 s with include_content."
         ),
     )
+    # Deprecated: ignored by the Serpex API and never sent. Still accepted so
+    # existing code keeps working; a DeprecationWarning is emitted when set.
+    # Removed in 0.3.0.
+    engine: Optional[str] = Field(default=None, description="Deprecated; ignored.")
+    category: Optional[str] = Field(default=None, description="Deprecated; ignored.")
+    time_range: Optional[str] = Field(default=None, description="Deprecated; ignored.")
 
     base_url: str = Field(default="https://api.serpex.dev")
 
@@ -112,97 +136,64 @@ class SerpexSearchResults(BaseTool):
         elif isinstance(api_key, str):
             values["api_key"] = SecretStr(api_key)
 
+        passed = [k for k in DEPRECATED_PARAMS if values.get(k) is not None]
+        if passed:
+            _warn_deprecated(passed)
+
+        if values.get("content_results", 5) not in (5, 10):
+            raise ValueError("content_results must be 5 or 10")
+
         return values
 
     def _build_params(self, query: str, **kwargs: Any) -> dict[str, Any]:
-        """Build parameters for the API request."""
-        params: dict[str, Any] = {
-            "q": query,
-            "engine": kwargs.get("engine", self.engine),
-            "category": kwargs.get("category", self.category),
+        """Build the query string: only q, include_content and content_results."""
+        passed = [k for k in DEPRECATED_PARAMS if kwargs.get(k) is not None]
+        if passed:
+            _warn_deprecated(passed)
+
+        params: dict[str, Any] = {"q": query}
+        include_content = kwargs.get("include_content", self.include_content)
+        if include_content:
+            content_results = kwargs.get("content_results", self.content_results)
+            if content_results not in (5, 10):
+                raise ValueError("content_results must be 5 or 10")
+            params["include_content"] = "true"
+            params["content_results"] = content_results
+        return params
+
+    def _headers(self) -> dict[str, str]:
+        return {
+            "Authorization": f"Bearer {self.api_key.get_secret_value()}",
+            "Content-Type": "application/json",
+            "User-Agent": USER_AGENT,
         }
 
-        # Add time_range if specified
-        time_range = kwargs.get("time_range") or self.time_range
-        if time_range is not None:
-            params["time_range"] = time_range
-
-        return params
+    def _timeout(self, params: dict[str, Any]) -> float:
+        if self.timeout is not None:
+            return self.timeout
+        return SEARCH_CONTENT_TIMEOUT if "include_content" in params else SEARCH_TIMEOUT
 
     def _format_results(self, data: dict[str, Any]) -> str:
         """Format the search results into a readable string."""
-        results_parts: list[str] = []
+        results = data.get("results")
+        if not isinstance(results, list) or not results:
+            message = data.get("message")
+            return message if message else "No search results found."
 
-        # Instant answers (from knowledge panels/answer boxes)
-        if (
-            "answers" in data
-            and isinstance(data["answers"], list)
-            and len(data["answers"]) > 0
-        ):
-            answer = data["answers"][0]
-            if "answer" in answer and answer["answer"]:
-                results_parts.append(f"Answer: {answer['answer']}")
-            elif "snippet" in answer and answer["snippet"]:
-                results_parts.append(f"Featured Snippet: {answer['snippet']}")
+        num_results = (data.get("metadata") or {}).get("number_of_results", len(results))
+        results_parts: list[str] = [f"Found {num_results} results:"]
 
-        # Infoboxes (knowledge panels)
-        if (
-            "infoboxes" in data
-            and isinstance(data["infoboxes"], list)
-            and len(data["infoboxes"]) > 0
-        ):
-            infobox = data["infoboxes"][0]
-            if "description" in infobox and infobox["description"]:
-                results_parts.append(f"Knowledge Panel: {infobox['description']}")
-
-        # Organic search results
-        if (
-            "results" in data
-            and isinstance(data["results"], list)
-            and len(data["results"]) > 0
-        ):
-            num_results = data.get("metadata", {}).get(
-                "number_of_results", len(data["results"])
-            )
-            results_parts.append(f"\nFound {num_results} results:\n")
-
-            for i, result in enumerate(data["results"][:10], 1):
-                title = result.get("title", "")
-                url = result.get("url", "")
-                snippet = result.get("snippet", "")
-                published_date = result.get("published_date")
-
-                result_text = f"[{i}] {title}"
-                if url:
-                    result_text += f"\nURL: {url}"
-                if snippet:
-                    result_text += f"\n{snippet}"
-                if published_date:
-                    result_text += f"\nPublished: {published_date}"
-
-                results_parts.append(result_text)
-
-        # Search suggestions
-        if (
-            not results_parts
-            and "suggestions" in data
-            and isinstance(data["suggestions"], list)
-            and len(data["suggestions"]) > 0
-        ):
-            results_parts.append("No direct results found. Related searches:")
-            results_parts.extend(data["suggestions"])
-
-        # Query corrections
-        if (
-            not results_parts
-            and "corrections" in data
-            and isinstance(data["corrections"], list)
-            and len(data["corrections"]) > 0
-        ):
-            results_parts.append(f"Did you mean: {', '.join(data['corrections'])}?")
-
-        if not results_parts:
-            return "No search results found."
+        for i, result in enumerate(results[:10], 1):
+            result_text = f"[{i}] {result.get('title', '')}"
+            if result.get("url"):
+                result_text += f"\nURL: {result['url']}"
+            if result.get("snippet"):
+                result_text += f"\n{result['snippet']}"
+            if result.get("content"):
+                result_text += f"\nContent:\n{result['content']}"
+            elif result.get("content_error"):
+                result_text += f"\nContent unavailable: {result['content_error']}"
+            results_parts.append(result_text)
 
         return "\n\n".join(results_parts)
 
@@ -214,17 +205,13 @@ class SerpexSearchResults(BaseTool):
     ) -> str:
         """Execute the search."""
         params = self._build_params(query, **kwargs)
-
-        headers = {
-            "Authorization": f"Bearer {self.api_key.get_secret_value()}",
-            "Content-Type": "application/json",
-        }
-
         url = f"{self.base_url}/api/search"
 
         try:
             with httpx.Client() as client:
-                response = client.get(url, params=params, headers=headers, timeout=30.0)
+                response = client.get(
+                    url, params=params, headers=self._headers(), timeout=self._timeout(params)
+                )
                 response.raise_for_status()
                 data = response.json()
 
@@ -248,18 +235,12 @@ class SerpexSearchResults(BaseTool):
     ) -> str:
         """Execute the search asynchronously."""
         params = self._build_params(query, **kwargs)
-
-        headers = {
-            "Authorization": f"Bearer {self.api_key.get_secret_value()}",
-            "Content-Type": "application/json",
-        }
-
         url = f"{self.base_url}/api/search"
 
         try:
             async with httpx.AsyncClient() as client:
                 response = await client.get(
-                    url, params=params, headers=headers, timeout=30.0
+                    url, params=params, headers=self._headers(), timeout=self._timeout(params)
                 )
                 response.raise_for_status()
                 data = response.json()

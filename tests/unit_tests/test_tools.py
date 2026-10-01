@@ -1,20 +1,25 @@
-"""Tests for SERPEX Search Tool."""
+"""Tests for the Serpex Search Tool (offline; HTTP is not called)."""
 
 import os
+import warnings
 from typing import Any
 
 import pytest
 from pydantic import SecretStr
 
+import langchain_serpex_python
 from langchain_serpex_python import SerpexSearchResults
+from langchain_serpex_python.tools import USER_AGENT
+
+IGNORED_PARAMS = ("engine", "engines", "category", "time_range", "num")
 
 
 def test_serpex_initialization() -> None:
     """Test that Serpex can be initialized with API key."""
     tool = SerpexSearchResults(api_key=SecretStr("test_api_key_12345"))
     assert tool.name == "serpex_search"
-    assert tool.engine == "auto"
-    assert tool.category == "web"
+    assert tool.include_content is False
+    assert tool.content_results == 5
 
 
 def test_serpex_initialization_from_env(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -22,40 +27,63 @@ def test_serpex_initialization_from_env(monkeypatch: pytest.MonkeyPatch) -> None
     monkeypatch.setenv("SERPEX_API_KEY", "env_test_key")
     tool = SerpexSearchResults()
     assert tool.name == "serpex_search"
+    assert tool.api_key.get_secret_value() == "env_test_key"
 
 
-def test_serpex_custom_parameters() -> None:
-    """Test that Serpex accepts custom parameters."""
+def test_deprecated_init_params_are_accepted_warned_and_not_sent() -> None:
+    """engine/category/time_range still construct, warn, and never reach the API."""
+    with pytest.warns(DeprecationWarning):
+        tool = SerpexSearchResults(
+            api_key=SecretStr("test_api_key"),
+            engine="legacy-value",
+            category="web",
+            time_range="day",
+        )
+    params = tool._build_params("test query")
+    assert params == {"q": "test query"}
+
+
+def test_no_warning_without_deprecated_params() -> None:
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        tool = SerpexSearchResults(api_key=SecretStr("test_key"))
+        tool._build_params("test query")
+
+
+def test_build_params_sends_only_q() -> None:
+    tool = SerpexSearchResults(api_key=SecretStr("test_key"))
+    params = tool._build_params("test query")
+    assert params == {"q": "test query"}
+    for name in IGNORED_PARAMS:
+        assert name not in params
+
+
+def test_build_params_drops_deprecated_overrides() -> None:
+    tool = SerpexSearchResults(api_key=SecretStr("test_key"))
+    with pytest.warns(DeprecationWarning):
+        params = tool._build_params("test query", engine="legacy-b", time_range="month")
+    assert params == {"q": "test query"}
+
+
+def test_build_params_include_content() -> None:
     tool = SerpexSearchResults(
-        api_key=SecretStr("test_api_key"),
-        engine="legacy-value",
-        category="web",
-        time_range="day",
-    )
-    assert tool.engine == "legacy-value"
-    assert tool.time_range == "day"
-
-
-def test_serpex_build_params() -> None:
-    """Test that _build_params creates correct parameters."""
-    tool = SerpexSearchResults(
-        api_key=SecretStr("test_key"), engine="legacy-a", time_range="week"
+        api_key=SecretStr("test_key"), include_content=True, content_results=10
     )
     params = tool._build_params("test query")
-
-    assert params["q"] == "test query"
-    assert params["engine"] == "legacy-a"
-    assert params["category"] == "web"
-    assert params["time_range"] == "week"
+    assert params == {"q": "test query", "include_content": "true", "content_results": 10}
+    assert tool._timeout(params) >= 60
 
 
-def test_serpex_build_params_override() -> None:
-    """Test that _build_params allows overrides."""
-    tool = SerpexSearchResults(api_key=SecretStr("test_key"), engine="legacy-a")
-    params = tool._build_params("test query", engine="legacy-b", time_range="month")
+def test_content_results_must_be_5_or_10() -> None:
+    with pytest.raises(ValueError):
+        SerpexSearchResults(api_key=SecretStr("test_key"), content_results=7)
 
-    assert params["engine"] == "legacy-b"
-    assert params["time_range"] == "month"
+
+def test_user_agent_names_package_and_version() -> None:
+    tool = SerpexSearchResults(api_key=SecretStr("test_key"))
+    assert USER_AGENT == "langchain-serpex-python/0.2.0"
+    assert tool._headers()["User-Agent"] == USER_AGENT
+    assert langchain_serpex_python.__version__ == "0.2.0"
 
 
 def test_serpex_format_results_with_organic() -> None:
@@ -70,14 +98,12 @@ def test_serpex_format_results_with_organic() -> None:
                 "title": "Test Result 1",
                 "url": "https://example.com/1",
                 "snippet": "This is a test snippet",
-                "published_date": None,
             },
             {
                 "position": 2,
                 "title": "Test Result 2",
                 "url": "https://example.com/2",
                 "snippet": "Another test snippet",
-                "published_date": "2025-01-22",
             },
         ],
     }
@@ -89,61 +115,34 @@ def test_serpex_format_results_with_organic() -> None:
     assert "Test Result 2" in formatted
     assert "https://example.com/1" in formatted
     assert "This is a test snippet" in formatted
-    assert "Published: 2025-01-22" in formatted
 
 
-def test_serpex_format_results_with_answers() -> None:
-    """Test formatting instant answers."""
+def test_serpex_format_results_with_content() -> None:
     tool = SerpexSearchResults(api_key=SecretStr("test_key"))
-
-    mock_data = {
-        "answers": [{"answer": "The capital of France is Paris."}],
-        "results": [],
+    mock_data: dict[str, Any] = {
+        "metadata": {"number_of_results": 2},
+        "results": [
+            {"title": "A", "url": "https://a.example", "snippet": "s", "content": "# Page A"},
+            {"title": "B", "url": "https://b.example", "snippet": "s", "content_error": "timeout"},
+        ],
     }
-
     formatted = tool._format_results(mock_data)
-    assert "Answer: The capital of France is Paris." in formatted
+    assert "# Page A" in formatted
+    assert "Content unavailable: timeout" in formatted
 
 
-def test_serpex_format_results_with_infoboxes() -> None:
-    """Test formatting knowledge panel/infobox."""
+def test_serpex_format_results_without_deprecated_engine_fields() -> None:
     tool = SerpexSearchResults(api_key=SecretStr("test_key"))
-
-    mock_data = {
-        "infoboxes": [{"description": "Python is a high-level programming language."}],
-        "results": [],
-    }
-
-    formatted = tool._format_results(mock_data)
-    assert "Knowledge Panel: Python is a high-level programming language." in formatted
+    formatted = tool._format_results(
+        {"results": [{"title": "T", "url": "https://t.example", "snippet": "s"}]}
+    )
+    assert "T" in formatted
 
 
-def test_serpex_format_results_with_suggestions() -> None:
-    """Test formatting search suggestions."""
+def test_serpex_format_results_no_results_message() -> None:
     tool = SerpexSearchResults(api_key=SecretStr("test_key"))
-
-    mock_data = {
-        "results": [],
-        "suggestions": ["coffee shops near me open now", "best coffee shops downtown"],
-    }
-
-    formatted = tool._format_results(mock_data)
-    assert "Related searches" in formatted
-    assert "coffee shops near me open now" in formatted
-
-
-def test_serpex_format_results_with_corrections() -> None:
-    """Test formatting query corrections."""
-    tool = SerpexSearchResults(api_key=SecretStr("test_key"))
-
-    mock_data = {
-        "results": [],
-        "corrections": ["python programming", "python language"],
-    }
-
-    formatted = tool._format_results(mock_data)
-    assert "Did you mean" in formatted
-    assert "python programming" in formatted
+    formatted = tool._format_results({"results": [], "message": "No results found for this query"})
+    assert formatted == "No results found for this query"
 
 
 def test_serpex_format_results_empty() -> None:
@@ -172,9 +171,7 @@ def test_serpex_real_search() -> None:
     if not api_key:
         pytest.skip("SERPEX_API_KEY not set")
 
-    tool = SerpexSearchResults(
-        api_key=SecretStr(api_key), engine="auto", category="web"
-    )
+    tool = SerpexSearchResults(api_key=SecretStr(api_key))
 
     result = tool._run("weather in San Francisco")
 
