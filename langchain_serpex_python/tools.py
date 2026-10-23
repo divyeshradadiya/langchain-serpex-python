@@ -1,36 +1,103 @@
 """Serpex Search Tool for LangChain."""
 
 import os
+import re
 import warnings
 from typing import Any, Optional
 
-import httpx
 from langchain_core.callbacks import CallbackManagerForToolRun
 from langchain_core.tools import BaseTool
-from pydantic import Field, SecretStr, model_validator
+from pydantic import Field, PrivateAttr, SecretStr, model_validator
 
-__version__ = "0.2.0"
+# The official SDK owns the HTTP contract (params, timeouts, error parsing), so
+# this tool cannot drift from the API on its own.
+from serpex import SearchParams, SearchResponse, SerpApiException, SerpexClient
 
+__version__ = "0.3.0"
+
+#: Product token appended to the SDK's User-Agent.
 USER_AGENT = f"langchain-serpex-python/{__version__}"
-
-# Client timeouts (seconds), above the server's own budget for each call
-# (search 30 s upstream, 45 s with include_content), so the tool never gives
-# up on a request the server still finishes and bills.
-SEARCH_TIMEOUT = 60.0
-SEARCH_CONTENT_TIMEOUT = 100.0
 
 # Accepted for backward compatibility, ignored by the Serpex API, never sent.
 DEPRECATED_PARAMS = ("engine", "engines", "category", "time_range")
+
+BILLING_URL = "https://app.serpex.dev/dashboard/billing"
 
 
 def _warn_deprecated(names: list[str]) -> None:
     warnings.warn(
         f"{', '.join(names)} {'is' if len(names) == 1 else 'are'} deprecated and "
         "ignored by the Serpex API; the value is not sent. Remove it from your "
-        "code; it will be removed in 0.3.0.",
+        "code; it will be removed in 0.4.0.",
         DeprecationWarning,
         stacklevel=2,
     )
+
+
+def _sentence(text: str) -> str:
+    return text if re.search(r"[.!?]$", text) else f"{text}."
+
+
+def _api_message(err: SerpApiException) -> str:
+    """The API's own error text (string, ``{"message"}`` or framework ``message``)."""
+    details = err.details or {}
+    error = details.get("error")
+    if isinstance(error, str) and error:
+        message = details.get("message")
+        if err.status_code == 404 and isinstance(message, str) and message:
+            return message
+        return error
+    if (
+        isinstance(error, dict)
+        and isinstance(error.get("message"), str)
+        and error["message"]
+    ):
+        return str(error["message"])
+    if isinstance(details.get("message"), str) and details["message"]:
+        return str(details["message"])
+    return str(err.args[0]) if err.args else "API request failed"
+
+
+def describe_serpex_error(err: Exception) -> str:
+    """One actionable sentence per failure.
+
+    Says what happened, whether it was charged and whether to retry.
+    """
+    if not isinstance(err, SerpApiException):
+        return _sentence(str(err))
+    status = err.status_code
+    details = err.details or {}
+    msg = _api_message(err)
+    if status is None:
+        return f"{_sentence(msg)} Safe to retry."
+    if status == 400:
+        return f"Request rejected (HTTP 400): {_sentence(msg)}"
+    if status == 401:
+        return f"API key rejected (HTTP 401): {_sentence(msg)} Check SERPEX_API_KEY."
+    if status == 402:
+        balance = details.get("remainingCredits")
+        balance_text = (
+            f" Balance: {balance} credits." if isinstance(balance, int) else ""
+        )
+        return (
+            f"Out of Serpex credits (HTTP 402).{balance_text} Top up at {BILLING_URL}."
+        )
+    if status == 429:
+        limit = details.get("limit")
+        limit_text = (
+            f" (limit: {limit} requests per second)" if isinstance(limit, int) else ""
+        )
+        wait = details.get("retryAfterMs")
+        wait_ms = wait if isinstance(wait, int) else 1000
+        return f"Rate limit exceeded{limit_text}. Retry in {wait_ms} ms."
+    if status >= 500:
+        charged = "" if re.search("charged", msg, re.I) else " Not charged."
+        retry = "" if re.search("retry", msg, re.I) else " Retry shortly."
+        return (
+            f"Serpex is temporarily unavailable (HTTP {status}): "
+            f"{_sentence(msg)}{charged}{retry}"
+        )
+    return f"HTTP {status}: {_sentence(msg)}"
 
 
 class SerpexSearchResults(BaseTool):
@@ -68,23 +135,9 @@ class SerpexSearchResults(BaseTool):
         print(results)
         ```
 
-    Example with Agent:
-        ```python
-        from langchain_serpex_python import SerpexSearchResults
-        from langchain_openai import ChatOpenAI
-        from langchain.agents import initialize_agent, AgentType
-
-        search = SerpexSearchResults(api_key="your-key")
-        llm = ChatOpenAI(temperature=0)
-
-        agent = initialize_agent(
-            tools=[search],
-            llm=llm,
-            agent=AgentType.ZERO_SHOT_REACT_DESCRIPTION
-        )
-
-        result = agent.run("What's the latest news about AI?")
-        ```
+    Errors are returned as a sentence the agent can act on (the tool does not
+    raise): ``Error searching with Serpex: ...`` with the HTTP status, whether
+    the request was charged and whether to retry.
     """
 
     name: str = "serpex_search"
@@ -105,7 +158,9 @@ class SerpexSearchResults(BaseTool):
     )
     content_results: int = Field(
         default=5,
-        description="How many top results get content when include_content is on: 5 or 10.",
+        description=(
+            "How many top results get content when include_content is on: 5 or 10."
+        ),
     )
     timeout: Optional[float] = Field(
         default=None,
@@ -115,12 +170,15 @@ class SerpexSearchResults(BaseTool):
     )
     # Deprecated: ignored by the Serpex API and never sent. Still accepted so
     # existing code keeps working; a DeprecationWarning is emitted when set.
-    # Removed in 0.3.0.
+    # Removed in 0.4.0. For a date filter put after:/before: in the query.
     engine: Optional[str] = Field(default=None, description="Deprecated; ignored.")
     category: Optional[str] = Field(default=None, description="Deprecated; ignored.")
     time_range: Optional[str] = Field(default=None, description="Deprecated; ignored.")
 
     base_url: str = Field(default="https://api.serpex.dev")
+
+    _client: Optional[SerpexClient] = PrivateAttr(default=None)
+    _client_key: Optional[tuple[str, str, Optional[float]]] = PrivateAttr(default=None)
 
     @model_validator(mode="before")
     @classmethod
@@ -145,54 +203,56 @@ class SerpexSearchResults(BaseTool):
 
         return values
 
-    def _build_params(self, query: str, **kwargs: Any) -> dict[str, Any]:
-        """Build the query string: only q, include_content and content_results."""
+    def _get_client(self) -> SerpexClient:
+        """One SDK client per (key, base URL, timeout), reused across calls."""
+        key = (self.api_key.get_secret_value(), self.base_url, self.timeout)
+        if self._client is None or self._client_key != key:
+            client = SerpexClient(key[0], base_url=self.base_url, timeout=self.timeout)
+            # Identify this package next to the SDK:
+            # "serpex-python/<v> langchain-serpex-python/<v>".
+            base_ua = client.session.headers.get("User-Agent", "")
+            if isinstance(base_ua, bytes):
+                base_ua = base_ua.decode("ascii", "replace")
+            client.session.headers["User-Agent"] = f"{base_ua} {USER_AGENT}".strip()
+            self._client = client
+            self._client_key = key
+        return self._client
+
+    def _build_params(self, query: str, **kwargs: Any) -> SearchParams:
+        """The search request: only q, plus include_content / content_results."""
         passed = [k for k in DEPRECATED_PARAMS if kwargs.get(k) is not None]
         if passed:
             _warn_deprecated(passed)
 
-        params: dict[str, Any] = {"q": query}
-        include_content = kwargs.get("include_content", self.include_content)
-        if include_content:
-            content_results = kwargs.get("content_results", self.content_results)
-            if content_results not in (5, 10):
-                raise ValueError("content_results must be 5 or 10")
-            params["include_content"] = "true"
-            params["content_results"] = content_results
-        return params
+        include_content = bool(kwargs.get("include_content", self.include_content))
+        if not include_content:
+            return SearchParams(q=query)
+        content_results = kwargs.get("content_results", self.content_results)
+        if content_results not in (5, 10):
+            raise ValueError("content_results must be 5 or 10")
+        return SearchParams(
+            q=query, include_content=True, content_results=content_results
+        )
 
-    def _headers(self) -> dict[str, str]:
-        return {
-            "Authorization": f"Bearer {self.api_key.get_secret_value()}",
-            "Content-Type": "application/json",
-            "User-Agent": USER_AGENT,
-        }
-
-    def _timeout(self, params: dict[str, Any]) -> float:
-        if self.timeout is not None:
-            return self.timeout
-        return SEARCH_CONTENT_TIMEOUT if "include_content" in params else SEARCH_TIMEOUT
-
-    def _format_results(self, data: dict[str, Any]) -> str:
+    def _format_results(self, data: SearchResponse) -> str:
         """Format the search results into a readable string."""
-        results = data.get("results")
-        if not isinstance(results, list) or not results:
-            message = data.get("message")
-            return message if message else "No search results found."
+        results = [r for r in data.results if r.snippet or r.title][:10]
+        if not results:
+            return data.message or data.metadata.message or "No search results found."
 
-        num_results = (data.get("metadata") or {}).get("number_of_results", len(results))
+        num_results = data.metadata.number_of_results or len(results)
         results_parts: list[str] = [f"Found {num_results} results:"]
 
-        for i, result in enumerate(results[:10], 1):
-            result_text = f"[{i}] {result.get('title', '')}"
-            if result.get("url"):
-                result_text += f"\nURL: {result['url']}"
-            if result.get("snippet"):
-                result_text += f"\n{result['snippet']}"
-            if result.get("content"):
-                result_text += f"\nContent:\n{result['content']}"
-            elif result.get("content_error"):
-                result_text += f"\nContent unavailable: {result['content_error']}"
+        for i, result in enumerate(results, 1):
+            result_text = f"[{i}] {result.title}"
+            if result.url:
+                result_text += f"\nURL: {result.url}"
+            if result.snippet:
+                result_text += f"\n{result.snippet}"
+            if result.content is not None:
+                result_text += f"\nContent:\n{result.content}"
+            elif result.content_error is not None:
+                result_text += f"\nContent unavailable: {result.content_error}"
             results_parts.append(result_text)
 
         return "\n\n".join(results_parts)
@@ -203,59 +263,16 @@ class SerpexSearchResults(BaseTool):
         run_manager: Optional[CallbackManagerForToolRun] = None,
         **kwargs: Any,
     ) -> str:
-        """Execute the search."""
-        params = self._build_params(query, **kwargs)
-        url = f"{self.base_url}/api/search"
+        """Execute the search.
 
+        The async path (``ainvoke``) runs this in LangChain's thread executor.
+        """
         try:
-            with httpx.Client() as client:
-                response = client.get(
-                    url, params=params, headers=self._headers(), timeout=self._timeout(params)
-                )
-                response.raise_for_status()
-                data = response.json()
-
-                if "error" in data:
-                    return f"SERPEX API error: {data['error']}"
-
-                return self._format_results(data)
-
-        except httpx.HTTPStatusError as e:
-            return f"HTTP error occurred: {e.response.status_code} - {e.response.text}"
-        except httpx.RequestError as e:
-            return f"Request error occurred: {str(e)}"
-        except Exception as e:
-            return f"Error searching with SERPEX: {str(e)}"
-
-    async def _arun(
-        self,
-        query: str,
-        run_manager: Optional[CallbackManagerForToolRun] = None,
-        **kwargs: Any,
-    ) -> str:
-        """Execute the search asynchronously."""
-        params = self._build_params(query, **kwargs)
-        url = f"{self.base_url}/api/search"
-
-        try:
-            async with httpx.AsyncClient() as client:
-                response = await client.get(
-                    url, params=params, headers=self._headers(), timeout=self._timeout(params)
-                )
-                response.raise_for_status()
-                data = response.json()
-
-                if "error" in data:
-                    return f"SERPEX API error: {data['error']}"
-
-                return self._format_results(data)
-
-        except httpx.HTTPStatusError as e:
-            return f"HTTP error occurred: {e.response.status_code} - {e.response.text}"
-        except httpx.RequestError as e:
-            return f"Request error occurred: {str(e)}"
-        except Exception as e:
-            return f"Error searching with SERPEX: {str(e)}"
+            params = self._build_params(query, **kwargs)
+            response = self._get_client().search(params)
+        except Exception as e:  # the tool reports failures to the agent as text
+            return f"Error searching with Serpex: {describe_serpex_error(e)}"
+        return self._format_results(response)
 
 
-__all__ = ["SerpexSearchResults"]
+__all__ = ["SerpexSearchResults", "describe_serpex_error"]

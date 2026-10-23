@@ -22,7 +22,7 @@ agents, LLM tools and RAG pipelines.
 ## Features
 
 - **Web search**: ranked results for any query, optionally with page content as markdown
-- **One search engine**: nothing to configure — no engine to pick
+- **Nothing to configure**: every search is routed automatically
 - **LangChain-native**: a drop-in `BaseTool` for agents and chains
 - **Easy integration**: API key via argument or `SERPEX_API_KEY`
 
@@ -89,10 +89,12 @@ print(results)
 
 ### Deprecated parameters
 
-Serpex is one search engine, so there is nothing to select. `engine`,
+Every search is routed automatically, so there is nothing to select. `engine`,
 `category` and `time_range` are deprecated and ignored by the Serpex API; they
 are still accepted so existing code keeps working, emit a `DeprecationWarning`,
-and are not sent. They will be removed in 0.3.0.
+and are not sent. They will be removed in 0.4.0. For a date filter, put
+`after:YYYY-MM-DD` / `before:YYYY-MM-DD` in the query; `site:` and `-site:` work
+the same way.
 
 ## Configuration
 
@@ -118,7 +120,34 @@ tool = SerpexSearchResults()  # Will use SERPEX_API_KEY from environment
 - `include_content` (bool): Also fetch page content (markdown) for the top results (default: `False`). Best-effort: a page that can't be extracted shows its `content_error` instead.
 - `content_results` (int): How many top results get content, `5` or `10` (default: `5`)
 - `timeout` (float): Request timeout in seconds (default: 60, or 100 with `include_content`)
-- `engine`, `category`, `time_range`: **Deprecated** — ignored by the Serpex API and not sent; removed in 0.3.0
+- `base_url` (str): API base URL (default `https://api.serpex.dev`)
+- `engine`, `category`, `time_range`: **Deprecated** — ignored by the Serpex API and not sent; removed in 0.4.0
+
+The tool sends only `q`, plus `include_content` / `content_results` when page content is on.
+
+### Output
+
+A numbered list: title, URL and snippet per result, then `Content:` (page markdown) or
+`Content unavailable: <reason>` for the top `content_results` results when `include_content` is
+on. An empty search returns the API's explanation, including whether it was charged.
+
+### Errors
+
+Errors are returned as text the agent can act on (the tool does not raise):
+`Error searching with Serpex: ...` with one sentence per HTTP status — 400 (bad argument), 401
+(check `SERPEX_API_KEY`), 402 (out of credits), 429 (rate limit: 5, 25 or 50 requests per second
+by plan, with the wait), 5xx (temporary, not charged).
+
+### Credits
+
+1 per search. With `include_content`: 1 when no page came back, 3 for 1-5 pages, 6 for 6-10
+pages. An empty result is charged only when it was confirmed as genuinely empty.
+
+## How it calls the API
+
+Through the official [`serpex`](https://pypi.org/project/serpex/) SDK (`>=2.12.0`), so request parameters,
+timeouts and error parsing follow the SDK. `ainvoke` runs the same call in LangChain's thread
+executor. Requests carry `User-Agent: serpex-python/<sdk version> langchain-serpex-python/<version>`.
 
 ## Documentation
 
