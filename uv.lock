@@ -397,7 +397,7 @@ wheels = [
 
 [[package]]
 name = "langchain-serpex-python"
-version = "0.2.1"
+version = "0.3.0"
 source = { editable = "." }
 dependencies = [
     { name = "langchain-core" },
@@ -428,7 +428,7 @@ typing = [
 [package.metadata]
 requires-dist = [
     { name = "langchain-core", specifier = ">=0.3.0,<1.0.0" },
-    { name = "serpex", specifier = ">=2.11.0,<3.0.0" },
+    { name = "serpex", specifier = ">=2.12.0,<3.0.0" },
 ]
 
 [package.metadata.requires-dev]
@@ -1661,15 +1661,15 @@ wheels = [
 
 [[package]]
 name = "serpex"
-version = "2.11.0"
+version = "2.12.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "requests" },
     { name = "typing-extensions", marker = "python_full_version < '3.10'" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/be/60/2ccea356c7c93704ad4ddfdb74d39e603b76fca11c931c937f8ae521922b/serpex-2.11.0.tar.gz", hash = "sha256:98d6b902f683dad6eb79d5fd6f67fd3360c5c31bed5e0c270910786d88256f44", size = 14716, upload-time = "2026-10-01T04:24:59.711Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/57/1a/f1e907a117ffa55a794560403905d2d5b4ba7ef17fc51f60fc34ccc44065/serpex-2.12.0.tar.gz", hash = "sha256:bd62d81384242ded7cfabdb55d03fb6534e3b20f21792f299485a336583967d3", size = 19663, upload-time = "2026-10-23T08:46:38.758Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/77/51/4de7ab4aa8c7676cf3aa0920061a028d1de2a8b6dba6e870c46aa87783c9/serpex-2.11.0-py3-none-any.whl", hash = "sha256:62df482ae5831ea50d0e1116045da79ad077afe592d5d387eb6efc6f3ec17e47", size = 14064, upload-time = "2026-10-01T04:24:58.776Z" },
+    { url = "https://files.pythonhosted.org/packages/3c/c3/d418c503318cdbf17985f25f1479dd91ddb1cfc5ee23bbb2342b2af57bf8/serpex-2.12.0-py3-none-any.whl", hash = "sha256:b7ac5aac89b1138fcad87ad0a2c458cdd3f5e9db76e1f090816c2fb82820e5b3", size = 17294, upload-time = "2026-10-23T08:46:37.707Z" },
 ]
 
 [[package]]
