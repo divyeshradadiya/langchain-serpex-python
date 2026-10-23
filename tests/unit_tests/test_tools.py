@@ -83,12 +83,12 @@ def test_serpex_initialization_from_env(monkeypatch: pytest.MonkeyPatch) -> None
 
 
 def test_version_and_user_agent() -> None:
-    assert langchain_serpex_python.__version__ == "0.2.1"
-    assert USER_AGENT == "langchain-serpex-python/0.2.1"
+    assert langchain_serpex_python.__version__ == "0.3.0"
+    assert USER_AGENT == "langchain-serpex-python/0.3.0"
     ua = make()._get_client().session.headers["User-Agent"]
     assert isinstance(ua, str)
     assert ua.startswith("serpex-python/")
-    assert ua.endswith(" langchain-serpex-python/0.2.1")
+    assert ua.endswith(" langchain-serpex-python/0.3.0")
 
 
 def test_deprecated_init_params_are_accepted_warned_and_not_sent() -> None:
@@ -195,11 +195,11 @@ def test_errors_are_one_actionable_sentence(name: str, expected: str) -> None:
 
 
 def test_rate_limit_and_balance_details_when_the_sdk_keeps_the_body() -> None:
-    # serpex >= 2.11.1 keeps the error body for 402/429; 2.11.0 drops it.
+    # serpex >= 2.12.0 keeps the 429 body: the wait comes from the API.
     tool = make()
     serve(tool, "error_429")
     out = tool.invoke("x")
-    assert "Retry in 292 ms" in out or "Retry in 1000 ms" in out
+    assert "(limit: 5 requests per second). Retry in 292 ms." in out
 
 
 async def test_async_path_uses_the_same_client() -> None:

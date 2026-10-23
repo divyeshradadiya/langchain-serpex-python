@@ -13,7 +13,7 @@ from pydantic import Field, PrivateAttr, SecretStr, model_validator
 # this tool cannot drift from the API on its own.
 from serpex import SearchParams, SearchResponse, SerpApiException, SerpexClient
 
-__version__ = "0.2.1"
+__version__ = "0.3.0"
 
 #: Product token appended to the SDK's User-Agent.
 USER_AGENT = f"langchain-serpex-python/{__version__}"
@@ -28,7 +28,7 @@ def _warn_deprecated(names: list[str]) -> None:
     warnings.warn(
         f"{', '.join(names)} {'is' if len(names) == 1 else 'are'} deprecated and "
         "ignored by the Serpex API; the value is not sent. Remove it from your "
-        "code; it will be removed in 0.3.0.",
+        "code; it will be removed in 0.4.0.",
         DeprecationWarning,
         stacklevel=2,
     )
@@ -170,7 +170,7 @@ class SerpexSearchResults(BaseTool):
     )
     # Deprecated: ignored by the Serpex API and never sent. Still accepted so
     # existing code keeps working; a DeprecationWarning is emitted when set.
-    # Removed in 0.3.0. For a date filter put after:/before: in the query.
+    # Removed in 0.4.0. For a date filter put after:/before: in the query.
     engine: Optional[str] = Field(default=None, description="Deprecated; ignored.")
     category: Optional[str] = Field(default=None, description="Deprecated; ignored.")
     time_range: Optional[str] = Field(default=None, description="Deprecated; ignored.")
