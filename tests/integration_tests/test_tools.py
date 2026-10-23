@@ -31,7 +31,7 @@ def test_serpex_search_integration() -> None:
 
 @pytest.mark.skipif("SERPEX_API_KEY" not in os.environ, reason="SERPEX_API_KEY not set")
 def test_serpex_deprecated_engine_still_accepted() -> None:
-    """The deprecated `engine` value still constructs (with a warning); it is not sent."""
+    """The deprecated `engine` still constructs (with a warning); it is not sent."""
     api_key = os.getenv("SERPEX_API_KEY")
     if not api_key:
         pytest.skip("SERPEX_API_KEY not set")

@@ -1,0 +1,541 @@
+{
+  "search_plain": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json; charset=utf-8",
+      "x-ratelimit-limit": "5",
+      "x-ratelimit-remaining": "4"
+    },
+    "request": {
+      "method": "POST",
+      "path": "/api/search",
+      "body": {
+        "q": "python asyncio tutorial"
+      }
+    },
+    "source": "live api.serpex.dev 2026-10-23",
+    "note": "plain search, charged 1"
+  },
+  "search_repeat_deprecated_engine": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json; charset=utf-8",
+      "deprecation": "@1782000000",
+      "link": "<https://serpex.dev/docs/api/search>; rel=\"deprecation\"; type=\"text/html\"",
+      "x-ratelimit-limit": "5",
+      "x-ratelimit-remaining": "3"
+    },
+    "request": {
+      "method": "POST",
+      "path": "/api/search",
+      "body": {
+        "q": "python asyncio tutorial",
+        "engine": "legacy-value",
+        "category": "web",
+        "time_range": "day",
+        "num_results": 3,
+        "language": "en"
+      }
+    },
+    "source": "live api.serpex.dev 2026-10-23",
+    "note": "same query repeated within 5 min with legacy engine/category/time_range/num_results/language: accepted, ignored, free repeat, Deprecation header"
+  },
+  "search_content": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json; charset=utf-8",
+      "x-ratelimit-limit": "5",
+      "x-ratelimit-remaining": "1"
+    },
+    "request": {
+      "method": "POST",
+      "path": "/api/search",
+      "body": {
+        "q": "what is retrieval augmented generation",
+        "include_content": true,
+        "content_results": 5
+      }
+    },
+    "source": "live api.serpex.dev 2026-10-23",
+    "note": "include_content 5, all delivered, 3 credits"
+  },
+  "search_content_errors": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json; charset=utf-8",
+      "x-ratelimit-limit": "5",
+      "x-ratelimit-remaining": "3"
+    },
+    "request": {
+      "method": "POST",
+      "path": "/api/search",
+      "body": {
+        "q": "example query",
+        "include_content": true,
+        "content_results": 5
+      }
+    },
+    "source": "live api.serpex.dev 2026-10-23",
+    "note": "include_content 5, every fetch robots_disallowed, 1 credit (captured live; query and results replaced with placeholders)"
+  },
+  "search_no_results": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json; charset=utf-8",
+      "x-ratelimit-limit": "5",
+      "x-ratelimit-remaining": "3"
+    },
+    "request": {
+      "method": "POST",
+      "path": "/api/search",
+      "body": {
+        "q": "\"zqxjv wplmk trnbq\" \"vyxhq zmplc\" kqwzx"
+      }
+    },
+    "source": "live api.serpex.dev 2026-10-23",
+    "note": "unverified empty, not charged"
+  },
+  "extract_markdown": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json; charset=utf-8",
+      "x-ratelimit-limit": "5",
+      "x-ratelimit-remaining": "2"
+    },
+    "request": {
+      "method": "POST",
+      "path": "/api/crawl",
+      "body": {
+        "urls": [
+          "https://example.com"
+        ]
+      }
+    },
+    "source": "live api.serpex.dev 2026-10-23",
+    "note": ""
+  },
+  "extract_html": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json; charset=utf-8",
+      "x-ratelimit-limit": "5",
+      "x-ratelimit-remaining": "4"
+    },
+    "request": {
+      "method": "POST",
+      "path": "/api/crawl",
+      "body": {
+        "urls": [
+          "https://example.com"
+        ],
+        "format": "html"
+      }
+    },
+    "source": "live api.serpex.dev 2026-10-23",
+    "note": ""
+  },
+  "extract_failed_404": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json; charset=utf-8",
+      "x-ratelimit-limit": "5",
+      "x-ratelimit-remaining": "4"
+    },
+    "request": {
+      "method": "POST",
+      "path": "/api/crawl",
+      "body": {
+        "urls": [
+          "https://example.com/this-page-does-not-exist-404"
+        ]
+      }
+    },
+    "source": "live api.serpex.dev 2026-10-23",
+    "note": "per-URL failure, not charged"
+  },
+  "extract_stealth": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json; charset=utf-8",
+      "x-ratelimit-limit": "5",
+      "x-ratelimit-remaining": "4"
+    },
+    "request": {
+      "method": "POST",
+      "path": "/api/crawl",
+      "body": {
+        "urls": [
+          "https://example.com"
+        ],
+        "stealth": true
+      }
+    },
+    "source": "live api.serpex.dev 2026-10-23",
+    "note": "stealth (ends 2026-11-01), 5 credits"
+  },
+  "usage": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json; charset=utf-8",
+      "x-ratelimit-limit": "5",
+      "x-ratelimit-remaining": "4"
+    },
+    "request": {
+      "method": "GET",
+      "path": "/api/usage"
+    },
+    "source": "live api.serpex.dev 2026-10-23",
+    "note": ""
+  },
+  "usage_days7": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json; charset=utf-8",
+      "x-ratelimit-limit": "5",
+      "x-ratelimit-remaining": "3"
+    },
+    "request": {
+      "method": "GET",
+      "path": "/api/usage?days=7"
+    },
+    "source": "live api.serpex.dev 2026-10-23",
+    "note": ""
+  },
+  "error_400_missing_q": {
+    "status": 400,
+    "headers": {
+      "content-type": "application/json; charset=utf-8",
+      "x-ratelimit-limit": "5",
+      "x-ratelimit-remaining": "2"
+    },
+    "request": {
+      "method": "POST",
+      "path": "/api/search",
+      "body": {}
+    },
+    "source": "live api.serpex.dev 2026-10-23",
+    "note": ""
+  },
+  "error_400_q_not_string": {
+    "status": 400,
+    "headers": {
+      "content-type": "application/json; charset=utf-8",
+      "x-ratelimit-limit": "5",
+      "x-ratelimit-remaining": "4"
+    },
+    "request": {
+      "method": "POST",
+      "path": "/api/search",
+      "body": {
+        "q": 123
+      }
+    },
+    "source": "live api.serpex.dev 2026-10-23",
+    "note": ""
+  },
+  "error_400_q_too_long": {
+    "status": 400,
+    "headers": {
+      "content-type": "application/json; charset=utf-8",
+      "x-ratelimit-limit": "5",
+      "x-ratelimit-remaining": "0"
+    },
+    "request": {
+      "method": "POST",
+      "path": "/api/search",
+      "body": {
+        "q": "a*501"
+      }
+    },
+    "source": "live api.serpex.dev 2026-10-23",
+    "note": ""
+  },
+  "error_400_content_results": {
+    "status": 400,
+    "headers": {
+      "content-type": "application/json; charset=utf-8",
+      "x-ratelimit-limit": "5",
+      "x-ratelimit-remaining": "4"
+    },
+    "request": {
+      "method": "POST",
+      "path": "/api/search",
+      "body": {
+        "q": "x",
+        "include_content": true,
+        "content_results": 7
+      }
+    },
+    "source": "live api.serpex.dev 2026-10-23",
+    "note": ""
+  },
+  "error_400_content_results_without_include": {
+    "status": 400,
+    "headers": {
+      "content-type": "application/json; charset=utf-8",
+      "x-ratelimit-limit": "5",
+      "x-ratelimit-remaining": "4"
+    },
+    "request": {
+      "method": "POST",
+      "path": "/api/search",
+      "body": {
+        "q": "x",
+        "content_results": 3
+      }
+    },
+    "source": "live api.serpex.dev 2026-10-23",
+    "note": ""
+  },
+  "error_400_include_content": {
+    "status": 400,
+    "headers": {
+      "content-type": "application/json; charset=utf-8",
+      "x-ratelimit-limit": "5",
+      "x-ratelimit-remaining": "4"
+    },
+    "request": {
+      "method": "POST",
+      "path": "/api/search",
+      "body": {
+        "q": "x",
+        "include_content": "yes"
+      }
+    },
+    "source": "live api.serpex.dev 2026-10-23",
+    "note": ""
+  },
+  "error_401_bad_key": {
+    "status": 401,
+    "headers": {
+      "content-type": "application/json; charset=utf-8"
+    },
+    "request": {
+      "method": "POST",
+      "path": "/api/search",
+      "auth": "invalid key"
+    },
+    "source": "live api.serpex.dev 2026-10-23",
+    "note": ""
+  },
+  "error_401_no_key": {
+    "status": 401,
+    "headers": {
+      "content-type": "application/json; charset=utf-8"
+    },
+    "request": {
+      "method": "POST",
+      "path": "/api/search",
+      "auth": "none"
+    },
+    "source": "live api.serpex.dev 2026-10-23",
+    "note": ""
+  },
+  "error_429": {
+    "status": 429,
+    "headers": {
+      "content-type": "application/json; charset=utf-8",
+      "retry-after": "1",
+      "x-ratelimit-limit": "5",
+      "x-ratelimit-remaining": "0"
+    },
+    "request": {
+      "method": "GET",
+      "path": "/api/usage",
+      "note": "14 parallel calls on a 5 rps org"
+    },
+    "source": "live api.serpex.dev 2026-10-23",
+    "note": ""
+  },
+  "error_400_extract_no_urls": {
+    "status": 400,
+    "headers": {
+      "content-type": "application/json; charset=utf-8",
+      "x-ratelimit-limit": "5",
+      "x-ratelimit-remaining": "4"
+    },
+    "request": {
+      "method": "POST",
+      "path": "/api/crawl",
+      "body": {}
+    },
+    "source": "live api.serpex.dev 2026-10-23",
+    "note": ""
+  },
+  "error_400_extract_urls_string": {
+    "status": 400,
+    "headers": {
+      "content-type": "application/json; charset=utf-8",
+      "x-ratelimit-limit": "5",
+      "x-ratelimit-remaining": "4"
+    },
+    "request": {
+      "method": "POST",
+      "path": "/api/crawl",
+      "body": {
+        "urls": "https://example.com"
+      }
+    },
+    "source": "live api.serpex.dev 2026-10-23",
+    "note": ""
+  },
+  "error_400_extract_too_many": {
+    "status": 400,
+    "headers": {
+      "content-type": "application/json; charset=utf-8",
+      "x-ratelimit-limit": "5",
+      "x-ratelimit-remaining": "3"
+    },
+    "request": {
+      "method": "POST",
+      "path": "/api/crawl",
+      "body": {
+        "urls": "11 urls"
+      }
+    },
+    "source": "live api.serpex.dev 2026-10-23",
+    "note": ""
+  },
+  "error_400_extract_invalid_url": {
+    "status": 400,
+    "headers": {
+      "content-type": "application/json; charset=utf-8",
+      "x-ratelimit-limit": "5",
+      "x-ratelimit-remaining": "2"
+    },
+    "request": {
+      "method": "POST",
+      "path": "/api/crawl",
+      "body": {
+        "urls": [
+          "not a url"
+        ]
+      }
+    },
+    "source": "live api.serpex.dev 2026-10-23",
+    "note": ""
+  },
+  "error_400_usage_days": {
+    "status": 400,
+    "headers": {
+      "content-type": "application/json; charset=utf-8",
+      "x-ratelimit-limit": "5",
+      "x-ratelimit-remaining": "4"
+    },
+    "request": {
+      "method": "GET",
+      "path": "/api/usage?days=0"
+    },
+    "source": "live api.serpex.dev 2026-10-23",
+    "note": ""
+  },
+  "error_404_news_route": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json; charset=utf-8"
+    },
+    "request": {
+      "method": "GET",
+      "path": "/api/search/news"
+    },
+    "source": "live api.serpex.dev 2026-10-23",
+    "note": ""
+  },
+  "error_404_extract_get": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json; charset=utf-8"
+    },
+    "request": {
+      "method": "GET",
+      "path": "/api/crawl"
+    },
+    "source": "live api.serpex.dev 2026-10-23",
+    "note": ""
+  },
+  "error_500_malformed_json": {
+    "status": 500,
+    "headers": {
+      "content-type": "application/json; charset=utf-8"
+    },
+    "request": {
+      "method": "POST",
+      "path": "/api/search",
+      "body": "{\"q\": "
+    },
+    "source": "live api.serpex.dev 2026-10-23",
+    "note": ""
+  },
+  "error_402_search": {
+    "status": 402,
+    "headers": {
+      "content-type": "application/json; charset=utf-8"
+    },
+    "source": "backend origin/main 4d0bea6 apiController.ts:267-272",
+    "note": "exact body from code; not triggered live"
+  },
+  "error_402_extract": {
+    "status": 402,
+    "headers": {
+      "content-type": "application/json; charset=utf-8"
+    },
+    "source": "backend origin/main 4d0bea6 apiController.ts:1201-1206 + creditCache.ts:281",
+    "note": "exact body from code; not triggered live"
+  },
+  "error_403_stealth_not_in_plan": {
+    "status": 403,
+    "headers": {
+      "content-type": "application/json; charset=utf-8"
+    },
+    "source": "backend origin/main 4d0bea6 apiController.ts:1171, planService.ts:190",
+    "note": "exact body from code; not triggered live"
+  },
+  "error_410_stealth_ended": {
+    "status": 410,
+    "headers": {
+      "content-type": "application/json; charset=utf-8"
+    },
+    "source": "backend origin/main 4d0bea6 apiController.ts:1157-1160, stealthEnd.ts:13",
+    "note": "exact body from code; not triggered live"
+  },
+  "error_500_search": {
+    "status": 500,
+    "headers": {
+      "content-type": "application/json; charset=utf-8"
+    },
+    "source": "backend origin/main 4d0bea6 apiController.ts:776",
+    "note": "exact body from code; not triggered live"
+  },
+  "error_502_extract": {
+    "status": 502,
+    "headers": {
+      "content-type": "application/json; charset=utf-8"
+    },
+    "source": "backend origin/main 4d0bea6 apiController.ts:1325-1329",
+    "note": "exact body from code; not triggered live"
+  },
+  "error_503_search": {
+    "status": 503,
+    "headers": {
+      "content-type": "application/json; charset=utf-8"
+    },
+    "source": "backend origin/main 4d0bea6 apiController.ts:754-763",
+    "note": "exact body from code; not triggered live"
+  },
+  "error_503_stealth_busy": {
+    "status": 503,
+    "headers": {
+      "content-type": "application/json; charset=utf-8"
+    },
+    "source": "backend origin/main 4d0bea6 apiController.ts:1256-1259",
+    "note": "exact body from code; not triggered live"
+  },
+  "error_504_extract": {
+    "status": 504,
+    "headers": {
+      "content-type": "application/json; charset=utf-8"
+    },
+    "source": "backend origin/main 4d0bea6 apiController.ts:1299-1303",
+    "note": "exact body from code; not triggered live"
+  }
+}

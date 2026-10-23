@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "langchain-serpex-python"
-version = "0.2.0"
+version = "0.2.1"
 description = "LangChain integration for Serpex, the web search API and extract API for AI agents (Python)"
 keywords = ["langchain", "serpex", "search", "search-api", "web-search", "ai-agents", "llm", "rag"]
 readme = "README.md"
@@ -13,7 +13,7 @@ authors = []
 requires-python = ">=3.9.0,<4.0.0"
 dependencies = [
   "langchain-core>=0.3.0,<1.0.0",
-  "httpx>=0.27.0",
+  "serpex>=2.11.0,<3.0.0",
 ]
 
 [project.urls]

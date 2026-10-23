@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.2.1 — 2026-10-23
+
+- Calls the API through the official `serpex` SDK (`>=2.11.0,<3`) instead of its own `httpx` code, so parameters, timeouts and error parsing cannot drift from the API. The response is typed (`serpex.SearchResponse`). `httpx` is no longer a dependency. The async path (`ainvoke`) runs the same call in LangChain's thread executor.
+- Errors: one actionable sentence per HTTP status (400, 401 check `SERPEX_API_KEY`, 402 out of credits, 429 retry after N ms with the plan limit, 5xx temporary and not charged) instead of the raw response body.
+- Private helpers changed: `_build_params()` returns `serpex.SearchParams`; `_format_results()` takes a `serpex.SearchResponse`; `_headers()` / `_timeout()` removed (the SDK owns them). New `describe_serpex_error()`.
+- `uv.lock` regenerated: the old one was for a package named `langchain-serpex` and pinned langchain-core 1.0.1 against this package's `<1.0.0` constraint.
+- `User-Agent: serpex-python/<sdk> langchain-serpex-python/0.2.1`.
+- Offline tests against recorded API responses (`tests/unit_tests/fixtures/`).
+
 ## 0.2.0 — 2026-10-01
 
 - New `include_content` / `content_results` (5 or 10): page content (markdown) for the top results, rendered under each result; failed pages show their `content_error`.

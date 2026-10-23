@@ -1,21 +1,75 @@
-"""Tests for the Serpex Search Tool (offline; HTTP is not called)."""
+"""Tests for the Serpex Search Tool (offline; HTTP is stubbed).
 
+tests/unit_tests/fixtures holds sanitized responses captured from
+api.serpex.dev on 2026-10-23 (statuses that cannot be triggered safely use the
+exact body from the backend code); manifest.json has each status and headers.
+The tool runs its real path through the official serpex SDK; only the SDK's
+HTTP session is replaced.
+"""
+
+import json
 import os
 import warnings
+from pathlib import Path
 from typing import Any
+from urllib.parse import parse_qs, urlparse
 
 import pytest
 from pydantic import SecretStr
+from serpex import SearchParams
 
 import langchain_serpex_python
 from langchain_serpex_python import SerpexSearchResults
 from langchain_serpex_python.tools import USER_AGENT
 
-IGNORED_PARAMS = ("engine", "engines", "category", "time_range", "num")
+FIXTURES = Path(__file__).parent / "fixtures"
+MANIFEST: dict[str, Any] = json.loads((FIXTURES / "manifest.json").read_text())
+IGNORED_PARAMS = ("engine", "engines", "category", "time_range", "num", "num_results")
+
+
+def fixture(name: str) -> Any:
+    return json.loads((FIXTURES / f"{name}.json").read_text())
+
+
+class FakeResponse:
+    def __init__(self, name: str) -> None:
+        meta = MANIFEST[name]
+        self.status_code: int = meta["status"]
+        self.ok = 200 <= self.status_code < 300
+        self.reason = ""
+        self.headers: dict[str, str] = meta["headers"]
+        self._body = fixture(name)
+
+    def json(self) -> Any:
+        return self._body
+
+
+def serve(tool: SerpexSearchResults, name: str) -> list[dict[str, Any]]:
+    """Answer every request of the tool's SDK client with one fixture."""
+    sent: list[dict[str, Any]] = []
+    client = tool._get_client()
+
+    def get(url: str, **kw: Any) -> FakeResponse:
+        sent.append(
+            {
+                "url": url,
+                "query": {k: v[0] for k, v in parse_qs(urlparse(url).query).items()},
+                **kw,
+            }
+        )
+        return FakeResponse(name)
+
+    client.session.get = get  # type: ignore[method-assign,assignment]
+    return sent
+
+
+def make(**kw: Any) -> SerpexSearchResults:
+    return SerpexSearchResults(
+        api_key=SecretStr("test_key"), base_url="https://example.invalid", **kw
+    )
 
 
 def test_serpex_initialization() -> None:
-    """Test that Serpex can be initialized with API key."""
     tool = SerpexSearchResults(api_key=SecretStr("test_api_key_12345"))
     assert tool.name == "serpex_search"
     assert tool.include_content is False
@@ -23,158 +77,151 @@ def test_serpex_initialization() -> None:
 
 
 def test_serpex_initialization_from_env(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Test that Serpex can be initialized from environment variable."""
     monkeypatch.setenv("SERPEX_API_KEY", "env_test_key")
     tool = SerpexSearchResults()
-    assert tool.name == "serpex_search"
     assert tool.api_key.get_secret_value() == "env_test_key"
 
 
+def test_version_and_user_agent() -> None:
+    assert langchain_serpex_python.__version__ == "0.2.1"
+    assert USER_AGENT == "langchain-serpex-python/0.2.1"
+    ua = make()._get_client().session.headers["User-Agent"]
+    assert isinstance(ua, str)
+    assert ua.startswith("serpex-python/")
+    assert ua.endswith(" langchain-serpex-python/0.2.1")
+
+
 def test_deprecated_init_params_are_accepted_warned_and_not_sent() -> None:
-    """engine/category/time_range still construct, warn, and never reach the API."""
     with pytest.warns(DeprecationWarning):
-        tool = SerpexSearchResults(
-            api_key=SecretStr("test_api_key"),
-            engine="legacy-value",
-            category="web",
-            time_range="day",
-        )
-    params = tool._build_params("test query")
-    assert params == {"q": "test query"}
+        tool = make(engine="legacy-value", category="web", time_range="day")
+    sent = serve(tool, "search_repeat_deprecated_engine")
+    out = tool.invoke("python asyncio tutorial")
+    assert sent[0]["query"] == {"q": "python asyncio tutorial"}
+    assert out.startswith("Found 10 results:")
 
 
 def test_no_warning_without_deprecated_params() -> None:
     with warnings.catch_warnings():
         warnings.simplefilter("error")
-        tool = SerpexSearchResults(api_key=SecretStr("test_key"))
-        tool._build_params("test query")
+        make()._build_params("test query")
 
 
 def test_build_params_sends_only_q() -> None:
-    tool = SerpexSearchResults(api_key=SecretStr("test_key"))
-    params = tool._build_params("test query")
-    assert params == {"q": "test query"}
-    for name in IGNORED_PARAMS:
-        assert name not in params
+    params = make()._build_params("test query")
+    assert params == SearchParams(q="test query")
 
 
 def test_build_params_drops_deprecated_overrides() -> None:
-    tool = SerpexSearchResults(api_key=SecretStr("test_key"))
     with pytest.warns(DeprecationWarning):
-        params = tool._build_params("test query", engine="legacy-b", time_range="month")
-    assert params == {"q": "test query"}
-
-
-def test_build_params_include_content() -> None:
-    tool = SerpexSearchResults(
-        api_key=SecretStr("test_key"), include_content=True, content_results=10
-    )
-    params = tool._build_params("test query")
-    assert params == {"q": "test query", "include_content": "true", "content_results": 10}
-    assert tool._timeout(params) >= 60
+        params = make()._build_params(
+            "test query", engine="legacy-b", time_range="month"
+        )
+    assert params == SearchParams(q="test query")
 
 
 def test_content_results_must_be_5_or_10() -> None:
     with pytest.raises(ValueError):
-        SerpexSearchResults(api_key=SecretStr("test_key"), content_results=7)
+        make(content_results=7)
 
 
-def test_user_agent_names_package_and_version() -> None:
-    tool = SerpexSearchResults(api_key=SecretStr("test_key"))
-    assert USER_AGENT == "langchain-serpex-python/0.2.0"
-    assert tool._headers()["User-Agent"] == USER_AGENT
-    assert langchain_serpex_python.__version__ == "0.2.0"
+def test_plain_search_end_to_end() -> None:
+    tool = make()
+    sent = serve(tool, "search_plain")
+    out = tool.invoke("python asyncio tutorial")
+    assert sent[0]["url"].startswith("https://example.invalid/api/search?")
+    assert sent[0]["query"] == {"q": "python asyncio tutorial"}
+    for name in IGNORED_PARAMS:
+        assert name not in sent[0]["query"]
+    assert sent[0]["timeout"] >= 60
+    assert out.startswith("Found 10 results:\n\n[1] ")
+    assert "Content" not in out
 
 
-def test_serpex_format_results_with_organic() -> None:
-    """Test formatting organic search results."""
-    tool = SerpexSearchResults(api_key=SecretStr("test_key"))
-
-    mock_data: dict[str, Any] = {
-        "metadata": {"number_of_results": 2},
-        "results": [
-            {
-                "position": 1,
-                "title": "Test Result 1",
-                "url": "https://example.com/1",
-                "snippet": "This is a test snippet",
-            },
-            {
-                "position": 2,
-                "title": "Test Result 2",
-                "url": "https://example.com/2",
-                "snippet": "Another test snippet",
-            },
-        ],
-    }
-
-    formatted = tool._format_results(mock_data)
-
-    assert "Found 2 results" in formatted
-    assert "Test Result 1" in formatted
-    assert "Test Result 2" in formatted
-    assert "https://example.com/1" in formatted
-    assert "This is a test snippet" in formatted
+def test_include_content_end_to_end() -> None:
+    tool = make(include_content=True, content_results=5)
+    sent = serve(tool, "search_content")
+    out = tool.invoke("what is retrieval augmented generation")
+    q = sent[0]["query"]
+    assert q["include_content"].lower() == "true"
+    assert q.get("content_results", "5") == "5"
+    assert sent[0]["timeout"] >= 100
+    assert out.count("\nContent:\n") == 5
 
 
-def test_serpex_format_results_with_content() -> None:
-    tool = SerpexSearchResults(api_key=SecretStr("test_key"))
-    mock_data: dict[str, Any] = {
-        "metadata": {"number_of_results": 2},
-        "results": [
-            {"title": "A", "url": "https://a.example", "snippet": "s", "content": "# Page A"},
-            {"title": "B", "url": "https://b.example", "snippet": "s", "content_error": "timeout"},
-        ],
-    }
-    formatted = tool._format_results(mock_data)
-    assert "# Page A" in formatted
-    assert "Content unavailable: timeout" in formatted
+def test_content_errors_are_rendered() -> None:
+    tool = make(include_content=True)
+    serve(tool, "search_content_errors")
+    out = tool.invoke("x")
+    assert out.count("Content unavailable: robots_disallowed") == 5
+    assert "\nContent:\n" not in out
 
 
-def test_serpex_format_results_without_deprecated_engine_fields() -> None:
-    tool = SerpexSearchResults(api_key=SecretStr("test_key"))
-    formatted = tool._format_results(
-        {"results": [{"title": "T", "url": "https://t.example", "snippet": "s"}]}
-    )
-    assert "T" in formatted
+def test_no_results_returns_the_api_message() -> None:
+    tool = make()
+    serve(tool, "search_no_results")
+    assert tool.invoke("x") == fixture("search_no_results")["message"]
 
 
-def test_serpex_format_results_no_results_message() -> None:
-    tool = SerpexSearchResults(api_key=SecretStr("test_key"))
-    formatted = tool._format_results({"results": [], "message": "No results found for this query"})
-    assert formatted == "No results found for this query"
+@pytest.mark.parametrize(
+    "name,expected",
+    [
+        ("error_401_bad_key", "API key rejected (HTTP 401)"),
+        ("error_402_search", "Out of Serpex credits (HTTP 402)"),
+        ("error_429", "Rate limit exceeded"),
+        (
+            "error_400_content_results",
+            "Request rejected (HTTP 400): content_results must be 5 or 10.",
+        ),
+        (
+            "error_503_search",
+            "Serpex is temporarily unavailable (HTTP 503): "
+            "Search temporarily unavailable, please retry. Not charged.",
+        ),
+        (
+            "error_500_search",
+            "Serpex is temporarily unavailable (HTTP 500): "
+            "Internal server error. Not charged. Retry shortly.",
+        ),
+        ("error_500_malformed_json", "Unexpected end of JSON input"),
+    ],
+)
+def test_errors_are_one_actionable_sentence(name: str, expected: str) -> None:
+    tool = make()
+    serve(tool, name)
+    out = tool.invoke("x")
+    assert out.startswith("Error searching with Serpex: ")
+    assert expected in out
+    assert "{" not in out  # never a dict repr
 
 
-def test_serpex_format_results_empty() -> None:
-    """Test formatting when no results."""
-    tool = SerpexSearchResults(api_key=SecretStr("test_key"))
+def test_rate_limit_and_balance_details_when_the_sdk_keeps_the_body() -> None:
+    # serpex >= 2.11.1 keeps the error body for 402/429; 2.11.0 drops it.
+    tool = make()
+    serve(tool, "error_429")
+    out = tool.invoke("x")
+    assert "Retry in 292 ms" in out or "Retry in 1000 ms" in out
 
-    mock_data: dict[str, Any] = {"results": []}
 
-    formatted = tool._format_results(mock_data)
-    assert formatted == "No search results found."
+async def test_async_path_uses_the_same_client() -> None:
+    tool = make()
+    sent = serve(tool, "search_plain")
+    out = await tool.ainvoke("python asyncio tutorial")
+    assert sent and out.startswith("Found 10 results:")
 
 
 def test_serpex_custom_base_url() -> None:
-    """Test that custom base URL is respected."""
     custom_url = "https://custom-api.example.com"
     tool = SerpexSearchResults(api_key=SecretStr("test_key"), base_url=custom_url)
     assert tool.base_url == custom_url
+    assert tool._get_client().base_url == custom_url
 
 
 # Integration test (requires real API key)
 @pytest.mark.skipif("SERPEX_API_KEY" not in os.environ, reason="SERPEX_API_KEY not set")
 def test_serpex_real_search() -> None:
-    """Test with real API (requires SERPEX_API_KEY environment variable)."""
     api_key = os.getenv("SERPEX_API_KEY")
-
     if not api_key:
         pytest.skip("SERPEX_API_KEY not set")
-
     tool = SerpexSearchResults(api_key=SecretStr(api_key))
-
     result = tool._run("weather in San Francisco")
-
-    assert result
-    assert len(result) > 0
-    assert "Error" not in result or "No search results" in result
+    assert result and not result.startswith("Error")
